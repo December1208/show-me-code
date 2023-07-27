@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+var (
+	TransformNegDeleteErr     = errors.New("transform contained negative delete")
+	TransformPositionOOBErr   = errors.New("transform position out of bounds of document")
+	TransformVersionTooOldErr = errors.New("transform version is too far behind")
+	TransformSkipedErr        = errors.New("transform version greater than latest")
+)
+
 type OTBuffer struct {
 	virtualLen int
 	Version    int
@@ -12,26 +19,35 @@ type OTBuffer struct {
 	Unapplied  []Transform
 }
 
+type OTBufferConfig struct {
+	MaxVirtualLen            uint64
+	MaxTransformInsertLength uint64
+}
+
+func NewOTBufferConfig() OTBufferConfig {
+	return OTBufferConfig{
+		MaxVirtualLen:            10485760, // 10MiB
+		MaxTransformInsertLength: 10240,    // 10KiB
+	}
+}
+
 func (b *OTBuffer) PushTransform(ot Transform) (Transform, int, error) {
 	if ot.Position < 0 {
-		return Transform{}, 0, errors.New("123")
+		return Transform{}, 0, TransformPositionOOBErr
 	}
 	if ot.Delete < 0 {
-		return Transform{}, 0, errors.New("123")
+		return Transform{}, 0, TransformNegDeleteErr
 	}
-	// if uint64(len(ot.Insert)) > b.config.MaxTransformLength {
-	// 	return Transform{}, 0, errors.New("123")
-	// }
 
 	lenApplied, lenUnapplied := len(b.Applied), len(b.Unapplied)
 
 	diff := (b.Version + 1) - ot.Version
 
-	if diff > lenApplied {
-		return Transform{}, 0, errors.New("123")
+	if diff > lenApplied+lenUnapplied {
+		return Transform{}, 0, TransformVersionTooOldErr
 	}
 	if diff < 0 {
-		return Transform{}, 0, errors.New("123")
+		return Transform{}, 0, TransformSkipedErr
 	}
 
 	for j := lenApplied - (diff - lenUnapplied); j < lenApplied; j++ {
@@ -42,12 +58,8 @@ func (b *OTBuffer) PushTransform(ot Transform) (Transform, int, error) {
 		FixTransform(&ot, &b.Unapplied[j])
 	}
 
-	// After adjustment check for document size bounds.
-	// if uint64(len(ot.Insert)-ot.Delete+b.virtualLen) > b.config.MaxDocumentSize {
-	// 	return Transform{}, 0, errors.New("123")
-	// }
 	if (ot.Position + ot.Delete) > b.virtualLen {
-		return Transform{}, 0, errors.New("123")
+		return Transform{}, 0, TransformPositionOOBErr
 	}
 
 	b.Version++
