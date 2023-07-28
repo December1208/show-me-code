@@ -1,4 +1,4 @@
-package ot
+package store
 
 import "show-me-code/pkg/util"
 

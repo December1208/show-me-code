@@ -1,4 +1,4 @@
-package ot
+package text
 
 import (
 	"errors"
