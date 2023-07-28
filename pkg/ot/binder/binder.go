@@ -7,11 +7,6 @@ import (
 	"time"
 )
 
-type ClientMetadata struct {
-	Client   interface{}
-	Metadata interface{}
-}
-
 type Config struct {
 	FlushPeriodMS           int64
 	CloseInactivityPeriodMS int64
@@ -26,11 +21,6 @@ type BinderImpl struct {
 
 	client    []*BinderClient
 	clientMux sync.Mutex
-}
-
-type BinderClient struct {
-	transformChan chan<- text.Transform
-	metaDataChan  chan<- ClientMetadata
 }
 
 func (b *BinderImpl) loop() {

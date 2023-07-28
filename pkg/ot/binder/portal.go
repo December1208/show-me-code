@@ -1,13 +1,19 @@
 package binder
 
-type Portal struct {
-	document Document
-	buffer   OTBuffer
-	// config   Config
+import "show-me-code/pkg/ot/text"
 
-	exitChan chan<- 
+type ClientMetadata struct {
+	Client   interface{}
+	Metadata interface{}
 }
 
-// type Config struct {
-// 	otConfig OTBufferConfig
-// }
+type BinderClient struct {
+	transformChan chan<- text.Transform
+	metaDataChan  chan<- ClientMetadata
+}
+
+type Portal struct {
+	client *BinderClient
+
+	// exitChan chan<-
+}
