@@ -21,7 +21,7 @@ type File struct {
 	unwrittenCache map[string]Document
 }
 
-func NewFile(storeDirectory string, allowWrites bool) (Store, error) {
+func NewFile(storeDirectory string, allowWrites bool) (Type, error) {
 	if len(storeDirectory) == 0 {
 		return nil, InvalidStoreDirectoryErr
 	}

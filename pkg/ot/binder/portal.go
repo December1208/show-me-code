@@ -1,19 +1,15 @@
 package binder
 
-import "show-me-code/pkg/ot/text"
+import (
+	"show-me-code/pkg/ot/text"
+)
 
-type ClientMetadata struct {
-	Client   interface{}
-	Metadata interface{}
-}
+type PortalImpl struct {
+	client *binderClient
 
-type BinderClient struct {
-	transformChan chan<- text.Transform
-	metaDataChan  chan<- ClientMetadata
-}
+	transformRcvChan <-chan text.Transform // 只读
 
-type Portal struct {
-	client *BinderClient
+	transformSendChan chan<- text.Transform // 只写
 
-	// exitChan chan<-
+	exitChan chan<- *binderClient
 }

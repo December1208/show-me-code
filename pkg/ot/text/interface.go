@@ -1,5 +1,5 @@
 package text
 
-type OTBufferInterface interface {
+type Type interface {
 	PushTransform(ot Transform) (Transform, int, error)
 }

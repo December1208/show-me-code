@@ -17,11 +17,22 @@ type OTBuffer struct {
 	Version    int
 	Applied    []Transform
 	Unapplied  []Transform
+	config     OTBufferConfig
 }
 
 type OTBufferConfig struct {
 	MaxVirtualLen            uint64
 	MaxTransformInsertLength uint64
+}
+
+func NewOTBuffer(content string, config OTBufferConfig) Type {
+	return &OTBuffer{
+		virtualLen: len(content),
+		config:     config,
+		Applied:    make([]Transform, 0),
+		Unapplied:  make([]Transform, 0),
+		Version:    1,
+	}
 }
 
 func NewOTBufferConfig() OTBufferConfig {
