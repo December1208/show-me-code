@@ -3,8 +3,11 @@ package curator
 import (
 	"show-me-code/pkg/ot/binder"
 	"show-me-code/pkg/ot/store"
+	"show-me-code/pkg/util"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -43,29 +46,35 @@ func (impl *CuratorImpl) loop() {
 		select {
 		case err := <-impl.errorChan:
 			if err.Err != nil {
-				// log
+				util.Logger.Error("binder err", zap.String("binderId", err.ID), zap.String("error", err.Err.Error()))
 			} else {
-				// log
+				util.Logger.Info("binder shutdown", zap.String("binderId", err.ID))
 			}
 			impl.binderMutex.Lock()
 			if b, ok := impl.openBinder[err.ID]; ok {
 				b.Close()
 				delete(impl.openBinder, err.ID)
-				// log
+				util.Logger.Info("close binder suc", zap.String("binderId", err.ID))
+
 			}
 			impl.binderMutex.Unlock()
 		case <-impl.closeChan:
-			// log
 			impl.binderMutex.Lock()
 			for _, b := range impl.openBinder {
 				b.Close()
-				// log
 			}
+			util.Logger.Info("close all binder suc")
 			impl.binderMutex.Unlock()
 			close(impl.closedChan)
 			return
 		}
 	}
+}
+
+func (impl *CuratorImpl) Close() {
+	util.Logger.Info("close curator")
+	impl.closeChan <- struct{}{}
+	<-impl.closedChan
 }
 
 func (impl *CuratorImpl) newBinder(id string) (binder.Type, error) {
@@ -95,6 +104,5 @@ func (impl *CuratorImpl) EditDocument(documentId string, timeout time.Duration) 
 
 	impl.openBinder[documentId] = binder
 	impl.binderMutex.Unlock()
-	binder.Close()
 	return nil, nil
 }

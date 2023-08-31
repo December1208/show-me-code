@@ -31,8 +31,9 @@ type BinderImpl struct {
 	clientMux     sync.Mutex
 
 	// Control Channels
-	closedChan chan struct{}
-	errorChan  chan<- Error
+	transformChan chan transformSubmission
+	closedChan    chan struct{}
+	errorChan     chan<- Error
 }
 
 func NewBinder(
@@ -73,14 +74,34 @@ func (b *BinderImpl) loop() {
 		running := true
 		select {
 		case <-flushTimer.C:
-
 			flushTimer.Reset(flushPeriod)
 		case <-closeTimer.C:
 			closeTimer.Reset(closePeriod)
+		case subscribeChan, open := <-b.subscribeChan:
+			if open {
+
+			} else {
+				running = false
+			}
 		}
 		if !running {
 
 		}
+	}
+}
+
+func (b *BinderImpl) processSubscriber(req subscribeRequest) error {
+	transformSendChan := make(chan text.Transform, 1)
+
+	client := binderClient{
+		metadata:          nil,
+		transformSendChan: transformSendChan,
+	}
+	portal := PortalImpl{
+		client:            &client,
+		transformRcvChan:  transformSendChan,
+		transformSendChan: b.transformChan,
+		// exitChan:          b,
 	}
 }
 

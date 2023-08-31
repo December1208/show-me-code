@@ -15,7 +15,7 @@ type ClientMetadata struct {
 type binderClient struct {
 	metadata interface{}
 
-	transformChan chan<- text.Transform
+	transformSendChan chan<- text.Transform
 }
 
 type transformSubmission struct {

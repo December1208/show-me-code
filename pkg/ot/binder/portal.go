@@ -9,7 +9,7 @@ type PortalImpl struct {
 
 	transformRcvChan <-chan text.Transform // 只读
 
-	transformSendChan chan<- text.Transform // 只写
+	transformSendChan chan<- transformSubmission // 只写
 
 	exitChan chan<- *binderClient
 }
