@@ -1,10 +1,16 @@
 package binder
 
 import (
+	"errors"
 	"show-me-code/pkg/ot/store"
 	"show-me-code/pkg/ot/text"
+	"show-me-code/pkg/util"
 	"sync"
 	"time"
+)
+
+var (
+	TimeoutError = errors.New("subscribe timeout error.")
 )
 
 type subscribeRequest struct {
@@ -15,25 +21,28 @@ type subscribeRequest struct {
 }
 
 type Config struct {
-	FlushPeriodMS           int64
-	CloseInactivityPeriodMS int64
-	OTBufferConfig          text.OTBufferConfig
+	FlushPeriodMS           int64               // 刷新间隔
+	CloseInactivityPeriodMS int64               // 关闭间隔
+	SubscribeTimeoutMS      int64               // 订阅超时时间
+	OTBufferConfig          text.OTBufferConfig // buffer 配置
 }
 
+// BinderImpl, 关联 doc 和 client
 type BinderImpl struct {
-	id       string
-	otBuffer text.Type
-	store    store.Type
-	config   Config
+	id       string     // id
+	otBuffer text.Type  // buffer struct
+	store    store.Type // store struct
+	config   Config     // 配置
 
-	client        []*binderClient
-	subscribeChan chan subscribeRequest
-	clientMux     sync.Mutex
+	clients       []*binderClient          // 客户端
+	subscribeChan chan subscribeRequest    // 订阅请求channel
+	clientMux     sync.Mutex               // 客户端锁
+	transformChan chan transformSubmission // 请求channel
 
 	// Control Channels
-	transformChan chan transformSubmission
-	closedChan    chan struct{}
-	errorChan     chan<- Error
+	closedChan chan struct{}      // 关闭 channel
+	errorChan  chan<- Error       // 异常 channel
+	exitChan   chan *binderClient // client 退出channel
 }
 
 func NewBinder(
@@ -47,7 +56,7 @@ func NewBinder(
 		id:            id,
 		store:         store,
 		config:        config,
-		client:        make([]*binderClient, 0),
+		clients:       make([]*binderClient, 0),
 		subscribeChan: make(chan subscribeRequest),
 		closedChan:    make(chan struct{}),
 		errorChan:     errorChan,
@@ -77,21 +86,58 @@ func (b *BinderImpl) loop() {
 			flushTimer.Reset(flushPeriod)
 		case <-closeTimer.C:
 			closeTimer.Reset(closePeriod)
-		case subscribeChan, open := <-b.subscribeChan:
+		case req, open := <-b.subscribeChan:
 			if open {
-
+				b.processSubscriber(req)
+			} else {
+				running = false
+			}
+		case req, open := <-b.transformChan:
+			if open {
+				b.processTransform(req)
 			} else {
 				running = false
 			}
 		}
+
 		if !running {
 
 		}
 	}
 }
 
+func (b *BinderImpl) Subscribe(timeout time.Duration) (Portal, error) {
+	portalChan, errChan := make(chan *PortalImpl, 1), make(chan error, 1)
+	req := subscribeRequest{
+		portalChan: portalChan,
+		errChan:    errChan,
+	}
+
+	select {
+	case b.subscribeChan <- req:
+	case <-time.After(timeout):
+		return nil, TimeoutError
+	}
+	select {
+	case portal := <-portalChan:
+		return portal, nil
+	case err := <-errChan:
+		return nil, err
+	case <-time.After(timeout):
+	}
+	return nil, TimeoutError
+}
+
 func (b *BinderImpl) processSubscriber(req subscribeRequest) error {
 	transformSendChan := make(chan text.Transform, 1)
+	_, err := b.flush()
+	if err != nil {
+		select {
+		case req.errChan <- err:
+		default:
+		}
+		return err
+	}
 
 	client := binderClient{
 		metadata:          nil,
@@ -101,8 +147,25 @@ func (b *BinderImpl) processSubscriber(req subscribeRequest) error {
 		client:            &client,
 		transformRcvChan:  transformSendChan,
 		transformSendChan: b.transformChan,
-		// exitChan:          b,
+		exitChan:          b.exitChan,
 	}
+	select {
+	case req.portalChan <- &portal:
+		b.clients = append(b.clients, &client)
+	case <-time.After(time.Duration(b.config.SubscribeTimeoutMS)):
+		util.Logger.Info("subscribe err.")
+	}
+	return nil
+}
+
+func (b *BinderImpl) processTransform(req transformSubmission) {
+
+}
+
+func (b *BinderImpl) flush() (store.Document, error) {
+
+	doc, err := b.store.Read(b.id)
+	return doc, err
 }
 
 func (b *BinderImpl) Close() {

@@ -7,11 +7,6 @@ type Error struct {
 	Err error
 }
 
-type ClientMetadata struct {
-	Client   interface{}
-	Metadata interface{}
-}
-
 type binderClient struct {
 	metadata interface{}
 
