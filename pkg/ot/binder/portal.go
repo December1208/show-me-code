@@ -13,3 +13,7 @@ type PortalImpl struct {
 
 	exitChan chan<- *binderClient
 }
+
+func (p *PortalImpl) SendTransform() {
+
+}
